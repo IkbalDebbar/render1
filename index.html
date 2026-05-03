@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raspberry Pi Robot Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Connection Overlay ── -->
+<div class="connect-overlay" id="connectOverlay">
+  <div class="connect-card">
+    <div class="icon-robot"><i class="fas fa-robot"></i></div>
+    <h2>ROBOT CONTROL</h2>
+    <p>Connect to your Raspberry Pi robot over the network</p>
+    <div class="form-group">
+      <label>Raspberry Pi IP Address</label>
+      <input type="text" class="form-input" id="inputIp" placeholder="192.168.1.100" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Port</label>
+      <input type="text" class="form-input" id="inputPort" placeholder="5000" value="5000">
+    </div>
+    <button class="btn-connect" id="btnConnect">
+      <i class="fas fa-plug"></i>&nbsp; CONNECT
+    </button>
+    <div class="connect-error" id="connectError"></div>
+    <div class="vpn-hint">
+      <i class="fas fa-shield-halved"></i>
+      For remote access, connect via WireGuard VPN before entering the Pi's local IP.
+    </div>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="header-logo">
+    <i class="fas fa-robot"></i> ROBOT CTRL
+  </div>
+  <div class="header-status">
+    <div><span class="status-dot" id="statusDot"></span><span id="statusText">Disconnected</span></div>
+    <div class="voltage-badge" id="voltageBadge"><i class="fas fa-bolt"></i> --V</div>
+    <button class="btn-disconnect" id="btnDisconnect"><i class="fas fa-power-off"></i> Disconnect</button>
+  </div>
+</header>
+
+<!-- ── Main Grid ── -->
+<div class="main-grid">
+
+  <!-- LEFT: Controls -->
+  <div class="controls-panel">
+    <!-- Joystick -->
+    <div class="card">
+      <div class="card-title"><i class="fas fa-gamepad"></i> Joystick Control</div>
+      <div class="joystick-container">
+        <canvas id="joystickCanvas" width="220" height="220"></canvas>
+      </div>
+    </div>
+
+    <!-- D-Pad -->
+    <div class="card">
+      <div class="card-title"><i class="fas fa-arrows-up-down-left-right"></i> Directional Control</div>
+      <div class="dpad-container">
+        <div class="dpad-row">
+          <div class="dpad-spacer"></div>
+          <button class="btn-dpad" data-dir="forward"><i class="fas fa-chevron-up"></i></button>
+          <div class="dpad-spacer"></div>
+        </div>
+        <div class="dpad-row">
+          <button class="btn-dpad" data-dir="left"><i class="fas fa-chevron-left"></i></button>
+          <button class="btn-dpad stop-btn" data-dir="stop"><i class="fas fa-stop"></i></button>
+          <button class="btn-dpad" data-dir="right"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="dpad-row">
+          <div class="dpad-spacer"></div>
+          <button class="btn-dpad" data-dir="backward"><i class="fas fa-chevron-down"></i></button>
+          <div class="dpad-spacer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Speed -->
+    <div class="card speed-control">
+      <div class="card-title"><i class="fas fa-gauge-high"></i> Motor Speed</div>
+      <div class="speed-value" id="speedValue">80<span>%</span></div>
+      <input type="range" id="speedSlider" min="0" max="100" value="80">
+    </div>
+    <!-- Servo Control -->
+    <div class="card servo-control-card">
+      <div class="card-title"><i class="fas fa-rotate"></i> Servo — Ultrasonic Angle</div>
+      <div class="servo-visual">
+        <canvas id="servoCanvas" width="260" height="100"></canvas>
+      </div>
+      <div class="servo-angle-display">
+        <span class="servo-angle-label">Current</span>
+        <span class="servo-angle-num" id="servoAngleNum">90</span>
+        <span class="servo-angle-unit">deg</span>
+      </div>
+      <div class="servo-btns">
+        <button class="btn-servo" data-angle="0">
+          <span class="servo-btn-angle">0&deg;</span>
+          <span class="servo-btn-label">Left</span>
+        </button>
+        <button class="btn-servo active" data-angle="90">
+          <span class="servo-btn-angle">90&deg;</span>
+          <span class="servo-btn-label">Center</span>
+        </button>
+        <button class="btn-servo" data-angle="180">
+          <span class="servo-btn-angle">180&deg;</span>
+          <span class="servo-btn-label">Right</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Camera -->
+  <div class="camera-panel card" style="padding:16px;">
+    <div class="card-title"><i class="fas fa-video"></i> Camera Feed</div>
+    <div class="video-wrapper">
+      <img id="videoFeed" alt="Camera feed" style="display:none;">
+      <div class="video-placeholder" id="videoPlaceholder">
+        <i class="fas fa-video-slash"></i>
+        <span>Waiting for connection...</span>
+      </div>
+      <div class="video-badge live" id="badgeLive"><i class="fas fa-circle" style="font-size:6px;"></i> LIVE</div>
+      <div class="video-badge rec" id="badgeRec"><div class="rec-dot"></div> REC</div>
+    </div>
+    <div class="camera-actions">
+      <button class="btn-cam" id="btnPhoto"><i class="fas fa-camera"></i> Take Photo</button>
+      <button class="btn-cam" id="btnRecord"><i class="fas fa-circle"></i> Record</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Sensors -->
+  <div class="sensors-panel">
+    <!-- Distance -->
+    <div class="card distance-display">
+      <div class="card-title"><i class="fas fa-satellite-dish"></i> Distance</div>
+      <div class="gauge-wrapper">
+        <canvas id="gaugeCanvas" width="320" height="320"></canvas>
+        <div class="distance-value">
+          <span class="num" id="distNum">--</span>
+          <span class="unit">cm</span>
+        </div>
+      </div>
+      <div class="distance-bar">
+        <div class="distance-bar-fill" id="distBar" style="width:0%"></div>
+      </div>
+    </div>
+    <!-- Motor Status -->
+    <div class="card motor-status">
+      <div class="card-title"><i class="fas fa-cogs"></i> Motor Status</div>
+      <div class="motor-row">
+        <span class="motor-label">Direction</span>
+        <span class="motor-val" id="motorDir">Stopped</span>
+      </div>
+      <div class="motor-row">
+        <span class="motor-label">Left Motor</span>
+        <span class="motor-val" id="motorLeft">0%</span>
+      </div>
+      <div class="motor-bar"><div class="motor-bar-fill left" id="motorLeftBar" style="width:0%"></div></div>
+      <div class="motor-row" style="margin-top:4px;">
+        <span class="motor-label">Right Motor</span>
+        <span class="motor-val" id="motorRight">0%</span>
+      </div>
+      <div class="motor-bar"><div class="motor-bar-fill right" id="motorRightBar" style="width:0%"></div></div>
+    </div>
+
+    <!-- Servo Info -->
+    <div class="card servo-info-card">
+      <div class="card-title"><i class="fas fa-rotate"></i> Servo Status</div>
+      <div class="motor-row">
+        <span class="motor-label">Angle</span>
+        <span class="motor-val" id="servoStatusAngle">90&deg;</span>
+      </div>
+      <div class="servo-angle-bar">
+        <div class="servo-angle-bar-track">
+          <div class="servo-angle-bar-fill" id="servoAngleBar" style="width:50%"></div>
+          <div class="servo-angle-bar-marker" id="servoAngleMarker" style="left:50%"></div>
+        </div>
+        <div class="servo-bar-labels">
+          <span>0&deg;</span>
+          <span>90&deg;</span>
+          <span>180&deg;</span>
+        </div>
+      </div>
+      <div class="motor-row" style="margin-top:8px;">
+        <span class="motor-label">State</span>
+        <span class="motor-val servo-state" id="servoState">Idle</span>
+      </div>
+    </div>
+
+    <!-- Data Manager -->
+    <div class="card data-manager-card">
+      <div class="card-title"><i class="fas fa-database"></i> Data Manager</div>
+      <div class="data-summary-grid">
+        <div class="data-summary-card">
+          <span class="data-summary-label">Commands Logged</span>
+          <span class="data-summary-value" id="dataCommands">0</span>
+        </div>
+        <div class="data-summary-card">
+          <span class="data-summary-label">Status Updates</span>
+          <span class="data-summary-value" id="dataStatus">0</span>
+        </div>
+        <div class="data-summary-card session-card">
+          <span class="data-summary-label">Session ID</span>
+          <span class="data-summary-value" id="sessionIdLabel">session_0000</span>
+        </div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-data" id="exportJsonBtn"><i class="fas fa-file-export"></i> Export JSON</button>
+        <button class="btn-data" id="exportCsvBtn"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button class="btn-data" id="recordingsBtn"><i class="fas fa-video"></i> Recordings</button>
+      </div>
+      <button class="btn-clear-data" id="clearDataBtn"><i class="fas fa-trash"></i> Clear All</button>
+      <div class="recent-commands-label">Recent Commands</div>
+      <div class="recent-commands-list" id="recentCommandsList"></div>
+    </div>
+
+    <!-- Status Log -->
+    <div class="card" style="flex:1; display:flex; flex-direction:column;">
+      <div class="card-title"><i class="fas fa-terminal"></i> Status Log</div>
+      <div class="status-log" id="statusLog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Socket.IO Client ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

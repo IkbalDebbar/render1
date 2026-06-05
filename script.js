@@ -61,7 +61,7 @@
     btnConnect.disabled = true;
 
     try {
-      socket = io("http://10.200.51.206:5000", {
+      socket = io("http://${ip}:${port}", {
         transports: ["websocket", "polling"],
         timeout: 8000
       });
